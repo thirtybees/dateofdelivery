@@ -35,7 +35,7 @@ class DateOfDelivery extends Module
 	{
 		$this->name = 'dateofdelivery';
 		$this->tab = 'shipping_logistics';
-		$this->version = '1.3';
+		$this->version = '1.4';
 		$this->author = 'PrestaShop';
 		$this->need_instance = 0;
 		
@@ -52,6 +52,7 @@ class DateOfDelivery extends Module
 		if (!parent::install()
 			|| !$this->registerHook('beforeCarrier')
 			|| !$this->registerHook('orderDetailDisplayed')
+			|| !$this->registerHook('actionCarrierUpdate')
 			||!$this->registerHook('displayPDFInvoice'))
 				return false;
 		
@@ -104,7 +105,13 @@ class DateOfDelivery extends Module
 		
 		return $this->_html;
 	}
-
+	
+	public function hookActionCarrierUpdate($params)
+	{
+		$new_carrier = $params['carrier'];
+		Db::getInstance()->execute('UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET `id_carrier` = '.(int)$new_carrier->id.' WHERE `id_carrier` = '.(int)$params['id_carrier']);
+	}
+	
 	public function hookBeforeCarrier($params)
 	{
 		if (!isset($params['delivery_option_list']) || !count($params['delivery_option_list']))
