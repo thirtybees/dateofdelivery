@@ -221,6 +221,22 @@ class DateOfDelivery extends Module
 
 	private function _postProcess()
 	{
+		if (Tools::isSubmit('saturdaystatusdateofdelivery') && $id_carrier_rule = Tools::getValue('id_carrier_rule'))
+		{
+			if ($this->_updateSaturdayStatus($id_carrier_rule))
+				Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&conf=4');
+			else
+				Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&conf=1');
+		}
+
+		if (Tools::isSubmit('sundaystatusdateofdelivery') && $id_carrier_rule = Tools::getValue('id_carrier_rule'))
+		{
+			if ($this->_updateSundayStatus($id_carrier_rule))
+				Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&conf=4');
+			else
+				Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&conf=1');
+		}
+
 		$errors = array();
 		if (Tools::isSubmit('submitMoreOptions'))
 		{
@@ -354,6 +370,36 @@ class DateOfDelivery extends Module
 		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
 		WHERE `id_carrier` = '.(int)($id_carrier).'
 		'.((int)$id_carrier_rule != 0 ? 'AND `id_carrier_rule` != '.(int)($id_carrier_rule) : ''));
+	}
+
+	private function _updateSaturdayStatus($id_carrier_rule)
+	{
+		if (!$this->_isCarrierRuleExists($id_carrier_rule))
+			return false;
+
+		$select = 'SELECT delivery_saturday FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
+		$old_value = (bool)Db::getInstance()->getValue($select);
+		$sql = 'UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET
+						`delivery_saturday` = '.(int)(!$old_value).' 
+						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
+
+		return Db::getInstance()->execute($sql);
+	}
+
+	private function _updateSundayStatus($id_carrier_rule)
+	{
+		if (!$this->_isCarrierRuleExists($id_carrier_rule))
+			return false;
+
+		$select = 'SELECT delivery_sunday FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
+		$old_value = (bool)Db::getInstance()->getValue($select);
+		$sql = 'UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET
+						`delivery_sunday` = '.(int)(!$old_value).' 
+						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
+
+		return Db::getInstance()->execute($sql);
 	}
 
 	/**
@@ -686,13 +732,13 @@ class DateOfDelivery extends Module
 				'title' => $this->l('Saturday delivery'),
 				'type' => 'bool',
 				'align' => 'center',
-				'active' => 'status',
+				'active' => 'saturdaystatus',
 			),
 			'delivery_sunday' => array(
 				'title' => $this->l('Sunday delivery'),
 				'type' => 'bool',
 				'align' => 'center',
-				'active' => 'status',
+				'active' => 'sundaystatus',
 			),
 		);
 		$list = $this->_getCarrierRulesWithCarrierName();
