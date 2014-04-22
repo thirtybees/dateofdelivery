@@ -264,7 +264,7 @@ class DateOfDelivery extends Module
 			if (($carrier = new Carrier((int)Tools::getValue('id_carrier'))) AND !Validate::isLoadedObject($carrier))
 				$errors[] = $this->l('Carrier is invalid');
 			if ($this->_isAlreadyDefinedForCarrier((int)($carrier->id), (int)(Tools::getValue('id_carrier_rule', 0))))
-				$errors[] = $this->l('You cannot use this carrier, a rule has already been saved.');
+				$errors[] = $this->l('This rule has already been defined for this carrier.');
 			
 			if (!sizeof($errors))
 			{
