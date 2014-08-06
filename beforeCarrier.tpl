@@ -70,7 +70,7 @@
 	}
 	$(function(){
 		refreshDateOfDelivery();
-		$('input[name=id_carrier]').change(function(){
+		$('input[name^=delivery_option]').change(function(){
 			refreshDateOfDelivery();
 		});
 	});
