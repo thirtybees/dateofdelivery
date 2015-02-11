@@ -26,7 +26,7 @@
 
 if (!defined('_PS_VERSION_'))
 	exit;
-	
+
 class DateOfDelivery extends Module
 {
 	private $_html = '';
@@ -38,23 +38,23 @@ class DateOfDelivery extends Module
 		$this->version = '1.5.1';
 		$this->author = 'PrestaShop';
 		$this->need_instance = 0;
-		
+
 		$this->bootstrap = true;
-		parent::__construct();	
-		
+		parent::__construct();
+
 		$this->displayName = $this->l('Date of delivery');
 		$this->description = $this->l('Displays an approximate date of delivery');
 	}
-	
+
 	public function install()
-	{	
+	{
 		if (!parent::install()
 			|| !$this->registerHook('beforeCarrier')
 			|| !$this->registerHook('orderDetailDisplayed')
 			|| !$this->registerHook('actionCarrierUpdate')
-			||!$this->registerHook('displayPDFInvoice'))
+			|| !$this->registerHook('displayPDFInvoice'))
 				return false;
-		
+
 		if (!Db::getInstance()->execute('
 		CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'dateofdelivery_carrier_rule` (
 			`id_carrier_rule` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -66,16 +66,16 @@ class DateOfDelivery extends Module
 		) ENGINE ='._MYSQL_ENGINE_.';
 		'))
 			return false;
-		
+
 		Configuration::updateValue('DOD_EXTRA_TIME_PRODUCT_OOS', 0);
 		Configuration::updateValue('DOD_EXTRA_TIME_PREPARATION', 1);
 		Configuration::updateValue('DOD_PREPARATION_SATURDAY', 1);
 		Configuration::updateValue('DOD_PREPARATION_SUNDAY', 1);
 		Configuration::updateValue('DOD_DATE_FORMAT', 'l j F Y');
-		
+
 		return true;
 	}
-	
+
 	public function uninstall()
 	{
 		Configuration::deleteByName('DOD_EXTRA_TIME_PRODUCT_OOS');
@@ -84,50 +84,48 @@ class DateOfDelivery extends Module
 		Configuration::deleteByName('DOD_PREPARATION_SUNDAY');
 		Configuration::deleteByName('DOD_DATE_FORMAT');
 		Db::getInstance()->execute('DROP TABLE IF EXISTS `'._DB_PREFIX_.'dateofdelivery_carrier_rule`');
-		
+
 		return parent::uninstall();
 	}
 
 	public function getContent()
-	{		
+	{
 		$this->_html .= '';
-		
+
 		$this->_postProcess();
-		if (Tools::isSubmit('addCarrierRule') OR (Tools::isSubmit('updatedateofdelivery') AND Tools::isSubmit('id_carrier_rule')))
+		if (Tools::isSubmit('addCarrierRule') || (Tools::isSubmit('updatedateofdelivery') && Tools::isSubmit('id_carrier_rule')))
 			$this->_html .= $this->renderAddForm();
 		else
 		{
 			$this->_html .= $this->renderList();
 			$this->_html .= $this->renderForm();
 		}
-			
-		
 		return $this->_html;
 	}
-	
+
 	public function hookActionCarrierUpdate($params)
 	{
 		$new_carrier = $params['carrier'];
 		Db::getInstance()->execute('UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET `id_carrier` = '.(int)$new_carrier->id.' WHERE `id_carrier` = '.(int)$params['id_carrier']);
 	}
-	
+
 	public function hookBeforeCarrier($params)
 	{
 		if (!isset($params['delivery_option_list']) || !count($params['delivery_option_list']))
 			return false;
-		
+
 		$package_list = $params['cart']->getPackageList();
 
-		$datesDelivery = array();
+		$dates_delivery = array();
 		foreach ($params['delivery_option_list'] as $id_address => $by_address)
 		{
-			$datesDelivery[$id_address] = array();
+			$dates_delivery[$id_address] = array();
 			foreach ($by_address as $key => $delivery_option)
 			{
 				$date_from = null;
 				$date_to = null;
-				$datesDelivery[$id_address][$key] = array();
-				
+				$dates_delivery[$id_address][$key] = array();
+
 				foreach ($delivery_option['carrier_list'] as $id_carrier => $carrier)
 				{
 					foreach ($carrier['package_list'] as $id_package)
@@ -149,12 +147,12 @@ class DateOfDelivery extends Module
 								if (isset($date_range) && (is_null($date_from) || $date_from < $date_range[0]))
 								{
 									$date_from = $date_range[0][1];
-									$datesDelivery[$id_address][$key][0] = $date_range[0];
+									$dates_delivery[$id_address][$key][0] = $date_range[0];
 								}
 								if (isset($date_range) && (is_null($date_to) || $date_to < $date_range[1]))
 								{
 									$date_to = $date_range[1][1];
-									$datesDelivery[$id_address][$key][1] = $date_range[1];
+									$dates_delivery[$id_address][$key][1] = $date_range[1];
 								}
 							}
 					}
@@ -164,29 +162,28 @@ class DateOfDelivery extends Module
 
 		$this->smarty->assign(array(
 			'nbPackages' => $params['cart']->getNbOfPackages(),
-			'datesDelivery' => $datesDelivery,
+			'datesDelivery' => $dates_delivery,
 			'delivery_option' => $params['delivery_option']
 		));
-		
+
 		return $this->display(__FILE__, 'beforeCarrier.tpl');
 	}
-	
+
 	public function hookOrderDetailDisplayed($params)
 	{
-		
 		$oos = false; // For out of stock management
 		foreach ($params['order']->getProducts() as $product)
 			if ($product['product_quantity_in_stock'] < 1)
 				$oos = true;
-		
-		$datesDelivery = array();		
-		$datesDelivery = $this->_getDatesOfDelivery((int)($params['order']->id_carrier), $oos, $params['order']->date_add);
-		
-		if (!is_array($datesDelivery) OR !sizeof($datesDelivery))
-			return ;
-			
-		$this->smarty->assign('datesDelivery', $datesDelivery);
-		
+
+		$dates_delivery = array();
+		$dates_delivery = $this->_getDatesOfDelivery((int)($params['order']->id_carrier), $oos, $params['order']->date_add);
+
+		if (!is_array($dates_delivery) || !count($dates_delivery))
+			return;
+
+		$this->smarty->assign('datesDelivery', $dates_delivery);
+
 		return $this->display(__FILE__, 'orderDetail.tpl');
 	}
 
@@ -212,8 +209,8 @@ class DateOfDelivery extends Module
 
 		$id_carrier = (int)OrderInvoice::getCarrierId($order_invoice->id);
 		$return = '';
-		if (($datesDelivery = $this->_getDatesOfDelivery($id_carrier, $oos, $order_invoice->date_add)) && isset($datesDelivery[0][0]) && isset($datesDelivery[1][0]))
-			$return = sprintf($this->l('Approximate date of delivery is between %1$s and %2$s'), $datesDelivery[0][0], $datesDelivery[1][0]);
+		if (($dates_delivery = $this->_getDatesOfDelivery($id_carrier, $oos, $order_invoice->date_add)) && isset($dates_delivery[0][0]) && isset($dates_delivery[1][0]))
+			$return = sprintf($this->l('Approximate date of delivery is between %1$s and %2$s'), $dates_delivery[0][0], $dates_delivery[1][0]);
 
 		return $return;
 	}
@@ -241,8 +238,8 @@ class DateOfDelivery extends Module
 		{
 			if (Tools::getValue('date_format') == '' OR !Validate::isCleanHtml(Tools::getValue('date_format')))
 				$errors[] = $this->l('Date format is invalid');
-			
-			if (!sizeof($errors))
+
+			if (!count($errors))
 			{
 				Configuration::updateValue('DOD_EXTRA_TIME_PRODUCT_OOS', (int)Tools::getValue('extra_time_product_oos'));
 				Configuration::updateValue('DOD_EXTRA_TIME_PREPARATION', (int)Tools::getValue('extra_time_preparation'));
@@ -254,9 +251,9 @@ class DateOfDelivery extends Module
 			else
 				$this->_html .= $this->displayError(implode('<br />', $errors));
 		}
-		
+
 		if (Tools::isSubmit('submitCarrierRule'))
-		{	
+		{
 			if (!Validate::isUnsignedInt(Tools::getValue('minimal_time')))
 				$errors[] = $this->l('Minimum time is invalid');
 			if (!Validate::isUnsignedInt(Tools::getValue('maximal_time')))
@@ -265,14 +262,14 @@ class DateOfDelivery extends Module
 				$errors[] = $this->l('Carrier is invalid');
 			if ($this->_isAlreadyDefinedForCarrier((int)($carrier->id), (int)(Tools::getValue('id_carrier_rule', 0))))
 				$errors[] = $this->l('This rule has already been defined for this carrier.');
-			
-			if (!sizeof($errors))
+
+			if (!count($errors))
 			{
 				if (Tools::isSubmit('addCarrierRule'))
 				{
 					if (Db::getInstance()->execute('
-					INSERT INTO `'._DB_PREFIX_.'dateofdelivery_carrier_rule`(`id_carrier`, `minimal_time`, `maximal_time`, `delivery_saturday`, `delivery_sunday`) 
-					VALUES ('.(int)($carrier->id).', '.(int)Tools::getValue('minimal_time').', '.(int)Tools::getValue('maximal_time').', '.(int)Tools::isSubmit('preparation_day_delivery_saturday').', '.(int)Tools::isSubmit('preparation_day_delivery_sunday').')
+					INSERT INTO `'._DB_PREFIX_.'dateofdelivery_carrier_rule`(`id_carrier`, `minimal_time`, `maximal_time`, `delivery_saturday`, `delivery_sunday`)
+					VALUES ('.(int)$carrier->id.', '.(int)Tools::getValue('minimal_time').', '.(int)Tools::getValue('maximal_time').', '.(int)Tools::isSubmit('preparation_day_delivery_saturday').', '.(int)Tools::isSubmit('preparation_day_delivery_sunday').')
 					'))
 						Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&confirmAddCarrierRule');
 					else
@@ -281,94 +278,94 @@ class DateOfDelivery extends Module
 				else
 				{
 					if (Db::getInstance()->execute('
-					UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule`  
-					SET `id_carrier` = '.(int)($carrier->id).', `minimal_time` = '.(int)Tools::getValue('minimal_time').', `maximal_time` = '.(int)Tools::getValue('maximal_time').', `delivery_saturday` = '.(int)Tools::isSubmit('preparation_day_delivery_saturday').', `delivery_sunday` = '.(int)Tools::isSubmit('preparation_day_delivery_sunday').'
+					UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+					SET `id_carrier` = '.(int)$carrier->id.', `minimal_time` = '.(int)Tools::getValue('minimal_time').', `maximal_time` = '.(int)Tools::getValue('maximal_time').', `delivery_saturday` = '.(int)Tools::isSubmit('preparation_day_delivery_saturday').', `delivery_sunday` = '.(int)Tools::isSubmit('preparation_day_delivery_sunday').'
 					WHERE `id_carrier_rule` = '.(int)Tools::getValue('id_carrier_rule')
 					))
 						Tools::redirectAdmin(AdminController::$currentIndex.'&configure='.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules').'&confirmupdatedateofdelivery');
 					else
 						$this->_html .= $this->displayError($this->l('An error occurred on updating of carrier rule.'));
 				}
-				
+
 			}
 			else
 				$this->_html .= $this->displayError(implode('<br />', $errors));
 		}
-		
-		if (Tools::isSubmit('deletedateofdelivery') AND Tools::isSubmit('id_carrier_rule') AND (int)Tools::getValue('id_carrier_rule') AND $this->_isCarrierRuleExists((int)Tools::getValue('id_carrier_rule')))
+
+		if (Tools::isSubmit('deletedateofdelivery') && Tools::isSubmit('id_carrier_rule') && (int)Tools::getValue('id_carrier_rule') && $this->_isCarrierRuleExists((int)Tools::getValue('id_carrier_rule')))
 		{
 			$this->_deleteByIdCarrierRule((int)Tools::getValue('id_carrier_rule'));
 			$this->_html .= $this->displayConfirmation($this->l('Carrier rule deleted successfully'));
 		}
-		
+
 		if (Tools::isSubmit('confirmAddCarrierRule'))
 			$this->_html = $this->displayConfirmation($this->l('Carrier rule added successfully'));
-		
+
 		if (Tools::isSubmit('confirmupdatedateofdelivery'))
 			$this->_html = $this->displayConfirmation($this->l('Carrier rule updated successfully'));
 	}
-	
+
 	private function _getCarrierRulesWithCarrierName()
 	{
 		return Db::getInstance()->executeS('
-		SELECT * 
-		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` dcr 
+		SELECT *
+		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` dcr
 		LEFT JOIN `'._DB_PREFIX_.'carrier` c ON (c.`id_carrier` = dcr.`id_carrier`)
 		');
 	}
-	
+
 	private function _getCarrierRule($id_carrier_rule)
 	{
-		if (!(int)($id_carrier_rule))
+		if (!(int)$id_carrier_rule)
 			return false;
 		return Db::getInstance()->getRow('
-		SELECT * 
-		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
-		WHERE `id_carrier_rule` = '.(int)($id_carrier_rule)
+		SELECT *
+		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+		WHERE `id_carrier_rule` = '.(int)$id_carrier_rule
 		);
 	}
-	
+
 	private function _getCarrierRuleWithIdCarrier($id_carrier)
 	{
 		if (!(int)($id_carrier))
 			return false;
 		return Db::getInstance()->getRow('
-		SELECT * 
-		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
-		WHERE `id_carrier` = '.(int)($id_carrier)
+		SELECT *
+		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+		WHERE `id_carrier` = '.(int)$id_carrier
 		);
 	}
-	
+
 	private function _isCarrierRuleExists($id_carrier_rule)
 	{
 		if (!(int)($id_carrier_rule))
 			return false;
 		return (bool)Db::getInstance()->getValue('
-		SELECT COUNT(*) 
-		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
-		WHERE `id_carrier_rule` = '.(int)($id_carrier_rule)
+		SELECT COUNT(*)
+		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+		WHERE `id_carrier_rule` = '.(int)$id_carrier_rule
 		);
 	}
-	
+
 	private function _deleteByIdCarrierRule($id_carrier_rule)
 	{
 		if (!(int)($id_carrier_rule))
 			return false;
 		return Db::getInstance()->execute('
-		DELETE FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
-		WHERE `id_carrier_rule` = '.(int)($id_carrier_rule)
+		DELETE FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
+		WHERE `id_carrier_rule` = '.(int)$id_carrier_rule
 		);
 	}
-	
+
 	private function _isAlreadyDefinedForCarrier($id_carrier, $id_carrier_rule = 0)
 	{
 		if (!(int)($id_carrier))
 			return false;
 		return (bool)Db::getInstance()->getValue('
-		SELECT COUNT(*) 
-		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule` 
+		SELECT COUNT(*)
+		FROM `'._DB_PREFIX_.'dateofdelivery_carrier_rule`
 		WHERE `id_carrier` = '.(int)($id_carrier).'
-		'.((int)$id_carrier_rule != 0 ? 'AND `id_carrier_rule` != '.(int)($id_carrier_rule) : ''));
+		'.((int)$id_carrier_rule != 0 ? 'AND `id_carrier_rule` != '.(int)$id_carrier_rule : ''));
 	}
 
 	private function _updateSaturdayStatus($id_carrier_rule)
@@ -380,7 +377,7 @@ class DateOfDelivery extends Module
 						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
 		$old_value = (bool)Db::getInstance()->getValue($select);
 		$sql = 'UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET
-						`delivery_saturday` = '.(int)(!$old_value).' 
+						`delivery_saturday` = '.(int)!$old_value.'
 						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
 
 		return Db::getInstance()->execute($sql);
@@ -395,7 +392,7 @@ class DateOfDelivery extends Module
 						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
 		$old_value = (bool)Db::getInstance()->getValue($select);
 		$sql = 'UPDATE `'._DB_PREFIX_.'dateofdelivery_carrier_rule` SET
-						`delivery_sunday` = '.(int)(!$old_value).' 
+						`delivery_sunday` = '.(int)!$old_value.'
 						WHERE `id_carrier_rule` = '.(int)$id_carrier_rule;
 
 		return Db::getInstance()->execute($sql);
@@ -410,46 +407,46 @@ class DateOfDelivery extends Module
 	 */
 	private function _getDatesOfDelivery($id_carrier, $product_oos = false, $date = null)
 	{
-		if (!(int)($id_carrier))
+		if (!(int)$id_carrier)
 			return false;
-		$carrier_rule = $this->_getCarrierRuleWithIdCarrier((int)($id_carrier));
+		$carrier_rule = $this->_getCarrierRuleWithIdCarrier((int)$id_carrier);
 		if (empty($carrier_rule))
 			return false;
 
-		if ($date != null AND Validate::isDate($date) AND strtotime($date) > time())
+		if ($date != null && Validate::isDate($date) && strtotime($date) > time())
 			$date_now = strtotime($date);
 		else
 			$date_now = time(); // Date on timestamp format
 		if ($product_oos)
 			$date_now += Configuration::get('DOD_EXTRA_TIME_PRODUCT_OOS') * 24 * 3600;
-		if (!Configuration::get('DOD_PREPARATION_SATURDAY') AND date('l', $date_now) == 'Saturday')
+		if (!Configuration::get('DOD_PREPARATION_SATURDAY') && date('l', $date_now) == 'Saturday')
 			$date_now += 24 * 3600;
-		if (!Configuration::get('DOD_PREPARATION_SUNDAY') AND date('l', $date_now) == 'Sunday')
+		if (!Configuration::get('DOD_PREPARATION_SUNDAY') && date('l', $date_now) == 'Sunday')
 			$date_now += 24 * 3600;
 
 		$date_minimal_time = $date_now + ($carrier_rule['minimal_time'] * 24 * 3600) + (Configuration::get('DOD_EXTRA_TIME_PREPARATION') * 24 * 3600);
 		$date_maximal_time = $date_now + ($carrier_rule['maximal_time'] * 24 * 3600) + (Configuration::get('DOD_EXTRA_TIME_PREPARATION') * 24 * 3600);
-		
-		if (!$carrier_rule['delivery_saturday'] AND date('l', $date_minimal_time) == 'Saturday')
+
+		if (!$carrier_rule['delivery_saturday'] && date('l', $date_minimal_time) == 'Saturday')
 		{
 			$date_minimal_time += 24 * 3600;
 			$date_maximal_time += 24 * 3600;
 		}
-		if (!$carrier_rule['delivery_saturday'] AND date('l', $date_maximal_time) == 'Saturday')
+		if (!$carrier_rule['delivery_saturday'] && date('l', $date_maximal_time) == 'Saturday')
 			$date_maximal_time += 24 * 3600;
-		
-		if (!$carrier_rule['delivery_sunday'] AND date('l', $date_minimal_time) == 'Sunday')
+
+		if (!$carrier_rule['delivery_sunday'] && date('l', $date_minimal_time) == 'Sunday')
 		{
 			$date_minimal_time += 24 * 3600;
 			$date_maximal_time += 24 * 3600;
 		}
-		if (!$carrier_rule['delivery_sunday'] AND date('l', $date_maximal_time) == 'Sunday')
+		if (!$carrier_rule['delivery_sunday'] && date('l', $date_maximal_time) == 'Sunday')
 			$date_maximal_time += 24 * 3600;
 
 		/*
-		
+
 		// Do not remove this commentary, it's usefull to allow translations of months and days in the translator tool
-		
+
 		$this->l('Sunday');
 		$this->l('Monday');
 		$this->l('Tuesday');
@@ -471,13 +468,13 @@ class DateOfDelivery extends Module
 		$this->l('November');
 		$this->l('December');
 		*/
-		
+
 		$date_minimal_string = '';
 		$date_maximal_string = '';
-		$date_format = preg_split('/([a-z])/Ui', Configuration::get('DOD_DATE_FORMAT'), NULL, PREG_SPLIT_DELIM_CAPTURE);
+		$date_format = preg_split('/([a-z])/Ui', Configuration::get('DOD_DATE_FORMAT'), null, PREG_SPLIT_DELIM_CAPTURE);
 		foreach ($date_format as $elmt)
 		{
-			if ($elmt == 'l' OR $elmt == 'F')
+			if ($elmt == 'l' || $elmt == 'F')
 			{
 				$date_minimal_string .= $this->l(date($elmt, $date_minimal_time));
 				$date_maximal_string .= $this->l(date($elmt, $date_maximal_time));
@@ -504,7 +501,7 @@ class DateOfDelivery extends Module
 			)
 		);
 	}
-	
+
 	public function renderForm()
 	{
 		$fields_form = array(
@@ -559,10 +556,10 @@ class DateOfDelivery extends Module
 				'class' => 'btn btn-default pull-right')
 			),
 		);
-		
+
 		$helper = new HelperForm();
 		$helper->show_toolbar = false;
-		$helper->table =  $this->table;
+		$helper->table = $this->table;
 		$lang = new Language((int)Configuration::get('PS_LANG_DEFAULT'));
 		$helper->default_form_language = $lang->id;
 		$helper->allow_employee_form_lang = Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') ? Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') : 0;
@@ -580,14 +577,14 @@ class DateOfDelivery extends Module
 
 		return $helper->generateForm(array($fields_form));
 	}
-	
+
 	public function renderAddForm()
 	{
 		$carriers = Carrier::getCarriers($this->context->language->id, true, false, false, null, Carrier::ALL_CARRIERS);
 
 		foreach ($carriers as $key => $val)
 			$carriers[$key]['name'] = (!$val['name'] ? Configuration::get('PS_SHOP_NAME') : $val['name']);
-		
+
 		$fields_form = array(
 			'form' => array(
 				'legend' => array(
@@ -619,7 +616,7 @@ class DateOfDelivery extends Module
 						),
 					array(
 						'type' => 'checkbox',
-						'label' => $this->l('Preparation option'),
+						'label' => $this->l('Delivery option'),
 						'name' => 'preparation_day',
 						'values' => array(
 							'id' => 'id',
@@ -627,12 +624,12 @@ class DateOfDelivery extends Module
 							'query' => array(
 								array(
 									'id' => 'delivery_saturday',
-									'name' => $this->l('Saturday preparation'),
+									'name' => $this->l('Delivery on Saturday'),
 									'val' => 1
 								),
 								array(
 									'id' => 'delivery_sunday',
-									'name' => $this->l('Sunday preparation'),
+									'name' => $this->l('Delivery on Sunday'),
 									'val' => 1
 								),
 							),
@@ -646,20 +643,20 @@ class DateOfDelivery extends Module
 				)
 			),
 		);
-		
+
 		if (Tools::getValue('id_carrier_rule') && $this->_isCarrierRuleExists(Tools::getValue('id_carrier_rule')))
 			$fields_form['form']['input'][] = array('type' => 'hidden', 'name' => 'id_carrier_rule');
-		
+
 		$helper = new HelperForm();
 		$helper->show_toolbar = false;
-		$helper->table =  $this->table;
+		$helper->table = $this->table;
 		$lang = new Language((int)Configuration::get('PS_LANG_DEFAULT'));
 		$helper->default_form_language = $lang->id;
 		$helper->allow_employee_form_lang = Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') ? Configuration::get('PS_BO_ALLOW_EMPLOYEE_FORM_LANG') : 0;
 		$this->fields_form = array();
 
 		$helper->identifier = $this->identifier;
-		
+
 		if (Tools::getValue('id_carrier_rule'))
 			$helper->submit_action = 'updatedateofdelivery';
 		else
@@ -674,7 +671,7 @@ class DateOfDelivery extends Module
 
 		return $helper->generateForm(array($fields_form));
 	}
-	
+
 	public function getConfigFieldsValues()
 	{
 		return array(
@@ -686,7 +683,7 @@ class DateOfDelivery extends Module
 			'id_carrier' => Tools::getValue('id_carrier'),
 		);
 	}
-	
+
 	public function getCarrierRuleFieldsValues()
 	{
 		$fields = array(
@@ -697,8 +694,8 @@ class DateOfDelivery extends Module
 			'delivery_saturday' => Tools::getValue('delivery_saturday'),
 			'delivery_sunday' => Tools::getValue('delivery_sunday'),
 			);
-		
-		if (Tools::isSubmit('updatedateofdelivery') AND $this->_isCarrierRuleExists(Tools::getValue('id_carrier_rule')))
+
+		if (Tools::isSubmit('updatedateofdelivery') && $this->_isCarrierRuleExists(Tools::getValue('id_carrier_rule')))
 		{
 			$carrier_rule = $this->_getCarrierRule(Tools::getValue('id_carrier_rule'));
 
@@ -712,12 +709,11 @@ class DateOfDelivery extends Module
 
 		return $fields;
 	}
-	
+
 	public function renderList()
 	{
-		
 		$add_url = $this->context->link->getAdminLink('AdminModules').'&configure='.$this->name.'&addCarrierRule=1';
-		
+
 		$fields_list = array(
 			'name' => array(
 				'title' => $this->l('Name of carrier'),
@@ -741,14 +737,14 @@ class DateOfDelivery extends Module
 			),
 		);
 		$list = $this->_getCarrierRulesWithCarrierName();
-		
+
 		foreach ($list as $key => $val)
 		{
 			if (!$val['name'])
 				$list[$key]['name'] = Configuration::get('PS_SHOP_NAME');
 			$list[$key]['delivery_between'] = sprintf($this->l('%1$d day(s) and %2$d day(s)'), $val['minimal_time'], $val['maximal_time']);
 		}
-		
+
 		$helper = new HelperList();
 		$helper->shopLinkType = '';
 		$helper->simple_header = true;
@@ -760,9 +756,9 @@ class DateOfDelivery extends Module
 		$helper->table = $this->name;
 		$helper->token = Tools::getAdminTokenLite('AdminModules');
 		$helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
-		
+
 		$this->context->smarty->assign(array('add_url' => $add_url));
-		
+
 		return $this->display(__FILE__, 'button.tpl').$helper->generateList($list, $fields_list).$this->display(__FILE__, 'button.tpl');
 	}
 }
