@@ -35,7 +35,7 @@ class DateOfDelivery extends Module
 	{
 		$this->name = 'dateofdelivery';
 		$this->tab = 'shipping_logistics';
-		$this->version = '1.6.0';
+		$this->version = '1.7.0';
 		$this->author = 'PrestaShop';
 		$this->need_instance = 0;
 
@@ -144,12 +144,12 @@ class DateOfDelivery extends Module
 
 								$date_range = $this->_getDatesOfDelivery($id_carrier, $oos, $available_date);
 
-								if (isset($date_range) && (is_null($date_from) || $date_from < $date_range[0]))
+								if (isset($date_range) && (is_null($date_from) || $date_from < $date_range[0][1]))
 								{
 									$date_from = $date_range[0][1];
 									$dates_delivery[$id_address][$key][0] = $date_range[0];
 								}
-								if (isset($date_range) && (is_null($date_to) || $date_to < $date_range[1]))
+								if (isset($date_range) && (is_null($date_to) || $date_to < $date_range[1][1]))
 								{
 									$date_to = $date_range[1][1];
 									$dates_delivery[$id_address][$key][1] = $date_range[1];
