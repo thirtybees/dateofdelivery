@@ -35,7 +35,7 @@ class DateOfDelivery extends Module
 	{
 		$this->name = 'dateofdelivery';
 		$this->tab = 'shipping_logistics';
-		$this->version = '1.7.0';
+		$this->version = '1.8.0';
 		$this->author = 'PrestaShop';
 		$this->need_instance = 0;
 
