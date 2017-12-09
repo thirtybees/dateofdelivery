@@ -1,0 +1,1 @@
+The date of delivery module allows you to set a date of delivery on the orders in your shop so your customers can see the expected date that their products will be delivered.
