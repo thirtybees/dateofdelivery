@@ -3,11 +3,12 @@ compatible_versions: 1.0.0+
 author: thirty bees
 category: shipping
 tags:
-  - shipping
-  - delivery
-  - estimated delivery
+- shipping
+- delivery
+- estimated delivery
+- dateofdelivery
 description_short: The date of delivery module allows you to set a date of delivery on your orders for customer to see.
 description: description.md
 images:
-  - image-1.png
+- image-1.png
 license: AFL
